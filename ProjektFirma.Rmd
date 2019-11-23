@@ -1,0 +1,235 @@
+---
+title: ""
+date: "`r Sys.Date()`"
+output:
+  rmdformats::readthedown:
+    highlight: kate
+---
+
+
+```{r knitr_init, echo=FALSE, cache=FALSE}
+library(knitr)
+library(rmdformats)
+
+## Global options
+options(max.print="75")
+opts_chunk$set(echo=FALSE,
+	             cache=TRUE,
+               prompt=FALSE,
+               tidy=TRUE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE)
+opts_knit$set(width=75)
+```
+# Loading packages
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(normalr)
+```
+
+
+# Welcome to my presentation
+
+This is a presentation about my own company "Verture Farm". This data is saved about the month Juli, August, September and October. First of all i will look on some visualizations about the harvest data and analyse it. After that i want to add the weather data to the harvest data to analyse the dependency between the amount of harvest and the weather.
+
+# Load Data
+
+First of all we have to load the data.
+
+```{r}
+df <- readRDS("Erntetabelle.rds")
+```
+
+Than lets view the data.
+
+```{r}
+# view(df) 
+```
+
+We see that there a lot of NA values. Lets tidy up the NA values.
+
+```{r}
+df <- df %>% select(-`Packungen Verkauft Marktschwärmer`) %>%
+  drop_na()
+
+```
+
+Manipulate the Date and add an interval column.
+
+```{r}
+df$Erntedatum <- ymd(df$Erntedatum)
+df$Aussaat <- ymd(df$Aussaat)
+
+df <- df %>%
+  mutate(Zeitstrecke = interval(ymd(Aussaat), ymd(Erntedatum)))
+
+```
+
+If you want to save all your datawrangling than use the save function.
+
+```{r}
+#saveRDS(df,"Erntetabelle.rds)
+```
+
+
+# The average amount of harvest
+
+Here we get the average amount of harvest per variety. I filtert out the varieties where we only got a few crops. So we concentrate on the varieties which are common. There "Radieschen rot", "Daikon Rettich", "Brokkoli", "Senf", "Sonnenblumen" und "Erbsen". 
+
+```{r}
+df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
+  group_by(Sorte) %>%
+  summarise(Durchschnittserntemenge = mean(`Geerntet in gramm`/`Anzahl Trays`), avg_profit_per_tray = mean(`Gewinn pro Tray bei Marktschwärmer`)) %>%
+  ggplot(aes(x = reorder(Sorte,Durchschnittserntemenge), y = Durchschnittserntemenge, fill = avg_profit_per_tray)) +
+  geom_col() +
+  coord_flip() +
+  xlab("Variety") +
+  ylab("Average amount of harvest in g")
+  
+
+
+```
+
+
+# Average time of grown
+
+```{r}
+df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
+  group_by(Sorte) %>%
+  summarise(avg_time = mean(Anbauzeit)) %>%
+  ggplot(aes(x = reorder(Sorte, avg_time), y = avg_time)) +
+  geom_col() +
+  coord_flip() +
+  ylab("Average time of growth in d")
+```
+
+
+# Time of growth over time
+
+```{r}
+df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
+  group_by(Sorte) %>%
+  ggplot(aes(x = Erntedatum, y = Anbauzeit, colour = Sorte)) +
+  geom_line() + 
+  geom_point() 
+
+```
+
+
+# Lets look some variables over time
+
+```{r}
+df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
+  ggplot(aes(x = Erntedatum, y = `Gramm pro Tray`, colour = Sorte)) +
+  geom_line() + 
+  geom_point() 
+
+df %>%
+  filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
+  group_by(wochen = week(Erntedatum)) %>%
+  summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
+  ggplot(aes(x = wochen, y = avg_harvest)) +
+  geom_line()
+  
+
+```
+
+
+Lets add the filter function to our data.frame.
+
+```{r}
+df1 <-df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander")
+```
+
+# Amount of Trays
+
+```{r}
+df %>% summarise(AmountTrays = sum(`Anzahl Trays`, na.rm = TRUE))
+
+df %>% summarise(PossibleProfit = sum(`Anzahl Trays`, na.rm = TRUE)*450/1000*30)
+```
+
+
+
+# Lets check the weather
+
+First of all we have to load some data.
+
+```{r}
+produkt_klima_tag_20180517_20191117_02564 <- read_delim("dataaktl/produkt_klima_tag_20180517_20191117_02564.txt", 
+    ";", escape_double = FALSE, trim_ws = TRUE)
+```
+
+
+Lets put the original data to a other data.frame and change the date column.
+
+```{r}
+weather <- produkt_klima_tag_20180517_20191117_02564
+weather$MESS_DATUM <- ymd(weather$MESS_DATUM)
+```
+ 
+ Lets have a look on the weather data with a little plot but beforehand we shut just choose the date where the farm was producing. Here we see the column names and their meaning.
+ 
+ FM : Daily mean of the wind speed in m/s
+ FX : Maxima of the wind peak m/sec
+ NM : Tagesmittel des Bedeckungsgrades in Achteln
+ PM : Tagesmittel des Luftdrucks in hpa
+ RSK : tgl. Niederschlagshöhe in mm
+ RSKF : tgl. Niederschlagsform im numerischen Code
+ SDK : Sonnenscheindauer in h
+ SHK_TAG : Schneehoeher Tageswert in cm
+ TGK : Minimum der Lufttemperatur am ERdboden in 5 cm Hoehe in °C
+ TMK : Tagesmittel der Temperatur in °C
+ TNK : Tagesminimum der Lufttemperatur in 2 m Hoehe in °C
+ TXK : Tagesmaximum der Lufttemperatur in 2 m Hoehe in °C
+ UPM : Tagesmittel der Relativen Feuchte in %
+ VPM : Tagesmittel des DAmpfdruckes in hpa
+ 
+```{r}
+weather <- weather %>% filter(year(weather$MESS_DATUM) == 2019, yday(weather$MESS_DATUM) >= 167, yday(weather$MESS_DATUM) <= 295) 
+
+weather %>%
+  ggplot(aes(x= MESS_DATUM, y = TMK)) +
+  geom_point()
+  
+#  year(weather$MESS_DATUM)  # Gibt das Jahr aus für alle Daten im df
+#  date(weather$MESS_DATUM)  # Gibt das Datum aus für alle Daten im df
+#  ymd(20190616)             # Gibt das Datum für den eingegebenen Zeitpunkt aus
+#  yday(ymd(20191022))       # Gibt den Tag im Jahr aus für das eingegebene Datum
+#  yday(weather$MESS_DATUM)  # Gibt den Tag im Jahr für alle Daten im df
+#  weather$MESS_DATUM        # Gibt alle Daten aus für alle Daten im df
+ 
+```
+ 
+ Try to get information for the plots from two different datasets.
+ 
+```{r}
+
+ggplot() +
+  geom_point(data = weather, aes(x = MESS_DATUM, y = TNK, size = UPM)) +
+  geom_smooth(data = df1, aes(x = Erntedatum, y = Anbauzeit), show.legend = FALSE) 
+ 
+
+p1 <- df %>%
+  filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
+  group_by(wochen = week(Erntedatum)) %>%
+  summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
+  ggplot(aes(x = wochen, y = avg_harvest)) +
+  geom_line()
+
+
+  
+```
+ 
+ To put the two datasets into one plot we have to normalize the numeric numbers.
+ 
+```{r}
+help("scale")
+normalise(df)
+
+```
+ 
+ 
