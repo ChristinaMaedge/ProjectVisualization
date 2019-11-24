@@ -28,6 +28,7 @@ opts_knit$set(width=75)
 library(tidyverse)
 library(lubridate)
 library(normalr)
+library(formatR)
 ```
 
 
@@ -230,7 +231,7 @@ weather1 <- weather %>%
   group_by(woche = week(MESS_DATUM)) %>%
   summarise(avg_tnk_week = mean(TNK), avg_txk_week = mean(TXK))
 
-df1 <- inner_join(df1, weather1, "woche")
+df1 <- inner_join(df1, weather1,by = "woche")
 
 ```
  
@@ -255,7 +256,7 @@ p1 %>%
 p2 <- df1 %>%
   group_by(woche, Sorte)
 
-p2 <- p2 %>%
+p2 %>%
   summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
   ggplot(aes(x = woche, y = avg_harvest, colour = Sorte)) +
   geom_line()
@@ -264,12 +265,18 @@ p2
  
 ```
  
- Add some more layers.
+ Add some more layers and tidy up the varieties.
  
 ```{r}
+p2 <- p2 %>%
+  summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
+  ggplot(aes(x = woche, y = avg_harvest)) +
+  geom_line()
+
 p2 + 
   geom_point(data = df1, aes(x = woche, y = avg_tnk_week), colour = "black") +
-  geom_line(data = df1, aes(x = woche, y = avg_txk_week), colour = "black")  
+  geom_line(data = df1, aes(x = woche, y = avg_txk_week), colour = "black") +
+  facet_wrap(~ Sorte)
   
 ```
  
