@@ -13,7 +13,7 @@ library(rmdformats)
 
 ## Global options
 options(max.print="75")
-opts_chunk$set(echo=FALSE,
+opts_chunk$set(echo=TRUE,
 	             cache=TRUE,
                prompt=FALSE,
                tidy=TRUE,
@@ -39,7 +39,7 @@ This is a presentation about my own company "Verture Farm". This data is saved a
 
 First of all we have to load the data.
 
-```{r}
+```{r echo=TRUE}
 df <- readRDS("Erntetabelle.rds")
 ```
 
@@ -57,7 +57,7 @@ df <- df %>% select(-`Packungen Verkauft Marktschwärmer`) %>%
 
 ```
 
-Manipulate the Date and add an interval column.
+Manipulate the Date and add an interval, week and some other columns.
 
 ```{r}
 df$Erntedatum <- ymd(df$Erntedatum)
@@ -65,6 +65,9 @@ df$Aussaat <- ymd(df$Aussaat)
 
 df <- df %>%
   mutate(Zeitstrecke = interval(ymd(Aussaat), ymd(Erntedatum)))
+
+df <- df %>%
+  mutate(woche = week(df$Erntedatum))
 
 ```
 
@@ -191,6 +194,9 @@ weather$MESS_DATUM <- ymd(weather$MESS_DATUM)
 ```{r}
 weather <- weather %>% filter(year(weather$MESS_DATUM) == 2019, yday(weather$MESS_DATUM) >= 167, yday(weather$MESS_DATUM) <= 295) 
 
+weather <- weather %>% 
+  mutate(woche = week(weather$MESS_DATUM))
+
 weather %>%
   ggplot(aes(x= MESS_DATUM, y = TMK)) +
   geom_point()
@@ -210,25 +216,69 @@ weather %>%
 
 ggplot() +
   geom_point(data = weather, aes(x = MESS_DATUM, y = TNK, size = UPM)) +
-  geom_smooth(data = df1, aes(x = Erntedatum, y = Anbauzeit), show.legend = FALSE) 
- 
+  geom_smooth(data = weather, aes(x = MESS_DATUM, y = TNK)) +
+  geom_smooth(data = df1, aes(x = Erntedatum, y = Anbauzeit), show.legend = FALSE)
 
-p1 <- df %>%
-  filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
-  group_by(wochen = week(Erntedatum)) %>%
+
+```
+ 
+ Some data wrangling to do better visualizations.
+ 
+```{r}
+
+weather1 <- weather %>%
+  group_by(woche = week(MESS_DATUM)) %>%
+  summarise(avg_tnk_week = mean(TNK), avg_txk_week = mean(TXK))
+
+df1 <- inner_join(df1, weather1, "woche")
+
+```
+ 
+ Take a look on the average harvest about the weeks.
+ 
+```{r}
+p1 <- df1 %>%
+  group_by(woche)
+
+p1 %>%
   summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
-  ggplot(aes(x = wochen, y = avg_harvest)) +
+  ggplot(aes(x = woche, y = avg_harvest)) +
+  geom_point() +
+  geom_line() +
+  geom_smooth()
+
+```
+ 
+ Create a line for every variety.
+ 
+```{r}
+p2 <- df1 %>%
+  group_by(woche, Sorte)
+
+p2 <- p2 %>%
+  summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
+  ggplot(aes(x = woche, y = avg_harvest, colour = Sorte)) +
   geom_line()
 
-
+p2
+ 
+```
+ 
+ Add some more layers.
+ 
+```{r}
+p2 + 
+  geom_point(data = df1, aes(x = woche, y = avg_tnk_week), colour = "black") +
+  geom_line(data = df1, aes(x = woche, y = avg_txk_week), colour = "black")  
   
 ```
+ 
  
  To put the two datasets into one plot we have to normalize the numeric numbers.
  
 ```{r}
 help("scale")
-normalise(df)
+#normalise(df)
 
 ```
  
