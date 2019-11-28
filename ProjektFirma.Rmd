@@ -4,6 +4,7 @@ date: "`r Sys.Date()`"
 output:
   rmdformats::readthedown:
     highlight: kate
+runtime: shiny
 ---
 
 
@@ -11,10 +12,10 @@ output:
 library(knitr)
 library(rmdformats)
 
+
 ## Global options
 options(max.print="75")
 opts_chunk$set(echo=TRUE,
-	             cache=TRUE,
                prompt=FALSE,
                tidy=TRUE,
                comment=NA,
@@ -29,6 +30,10 @@ library(tidyverse)
 library(lubridate)
 library(normalr)
 library(formatR)
+library(gridExtra)
+library(plotly)
+library(shiny)
+library(DT)
 ```
 
 
@@ -193,7 +198,7 @@ weather$MESS_DATUM <- ymd(weather$MESS_DATUM)
  VPM : Tagesmittel des DAmpfdruckes in hpa
  
 ```{r}
-weather <- weather %>% filter(year(weather$MESS_DATUM) == 2019, yday(weather$MESS_DATUM) >= 167, yday(weather$MESS_DATUM) <= 295) 
+weather <- weather %>% filter(year(weather$MESS_DATUM) == 2019, yday(weather$MESS_DATUM) >= 182, yday(weather$MESS_DATUM) <= 295) 
 
 weather <- weather %>% 
   mutate(woche = week(weather$MESS_DATUM))
@@ -204,8 +209,8 @@ weather %>%
   
 #  year(weather$MESS_DATUM)  # Gibt das Jahr aus für alle Daten im df
 #  date(weather$MESS_DATUM)  # Gibt das Datum aus für alle Daten im df
-#  ymd(20190616)             # Gibt das Datum für den eingegebenen Zeitpunkt aus
-#  yday(ymd(20191022))       # Gibt den Tag im Jahr aus für das eingegebene Datum
+#  ymd(20190701)             # Gibt das Datum für den eingegebenen Zeitpunkt aus
+#  yday(ymd(20190701))       # Gibt den Tag im Jahr aus für das eingegebene Datum
 #  yday(weather$MESS_DATUM)  # Gibt den Tag im Jahr für alle Daten im df
 #  weather$MESS_DATUM        # Gibt alle Daten aus für alle Daten im df
  
@@ -215,78 +220,208 @@ weather %>%
  
 ```{r}
 
-ggplot() +
-  geom_point(data = weather, aes(x = MESS_DATUM, y = TNK, size = UPM)) +
-  geom_smooth(data = weather, aes(x = MESS_DATUM, y = TNK)) +
+b1 <- ggplot() +
+  geom_point(data = weather, aes(x = MESS_DATUM, y = TNK)) +
+  geom_smooth(data = weather, aes(x = MESS_DATUM, y = TNK)) 
+b2 <- ggplot() +
   geom_smooth(data = df1, aes(x = Erntedatum, y = Anbauzeit), show.legend = FALSE)
 
+grid.arrange(b1,b2)
 
 ```
  
- Some data wrangling to do better visualizations.
+ Some data wrangling to do better visualizations. I added some average temperatures to the havest data.frame.
  
-```{r}
+```{r include=FALSE}
 
 weather1 <- weather %>%
-  group_by(woche = week(MESS_DATUM)) %>%
+  group_by(woche) %>%
   summarise(avg_tnk_week = mean(TNK), avg_txk_week = mean(TXK))
 
-df1 <- inner_join(df1, weather1,by = "woche")
+df2 <- inner_join(df1, weather1,by = c("woche"))
 
 ```
  
  Take a look on the average harvest about the weeks.
  
 ```{r}
-p1 <- df1 %>%
+p1 <- df2 %>%
   group_by(woche)
 
-p1 %>%
-  summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
-  ggplot(aes(x = woche, y = avg_harvest)) +
-  geom_point() +
+p1 <- p1 %>%
+  summarise(avg_harvest = mean(`Gramm pro Tray`), avg_tnk_week = mean(avg_tnk_week), avg_txk_week = mean(avg_txk_week)) %>%
+  ggplot(aes(x = woche, y = avg_harvest))  +
   geom_line() +
   geom_smooth()
+
+p1
+
+p1 +
+  geom_point(aes(size = avg_tnk_week, colour = avg_txk_week))
+
 
 ```
  
  Create a line for every variety.
  
 ```{r}
-p2 <- df1 %>%
+p2 <- df2 %>%
   group_by(woche, Sorte)
 
 p2 %>%
   summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
   ggplot(aes(x = woche, y = avg_harvest, colour = Sorte)) +
   geom_line()
-
-p2
  
 ```
  
  Add some more layers and tidy up the varieties.
  
 ```{r}
-p2 <- p2 %>%
+p2 %>%
   summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
   ggplot(aes(x = woche, y = avg_harvest)) +
-  geom_line()
-
-p2 + 
-  geom_point(data = df1, aes(x = woche, y = avg_tnk_week), colour = "black") +
-  geom_line(data = df1, aes(x = woche, y = avg_txk_week), colour = "black") +
+  geom_line() +
   facet_wrap(~ Sorte)
+
   
 ```
  
  
- To put the two datasets into one plot we have to normalize the numeric numbers.
+ To put the two datasets into one plot we have to normalize the numeric numbers or we use a grid.Extra package to show the different plots above each other.
  
 ```{r}
-help("scale")
-#normalise(df)
 
+p3 <- weather %>%
+  ggplot(aes(x = woche, y = TNK)) +
+  geom_point(colour = "blue") +
+  geom_point(aes(x = woche, y = TXK), colour = "red")
+
+grid.arrange(p1,p3)
+
+
+```
+ 
+ 
+ Lets have a look on the amount of trays per week.
+ 
+```{r}
+p4 <- df2 %>%
+  group_by(woche) %>%
+  summarise(amountTrays = sum(`Anzahl Trays`), amountGramm = sum(`Geerntet in gramm`), avg_tnk_week = mean(avg_tnk_week)) %>%
+  ggplot(aes(x = woche, y = amountTrays, size = amountGramm, colour = avg_tnk_week)) +
+  geom_point() +
+  geom_smooth() 
+
+ggplotly(p4, tooltip = c("colour", "size"))
+  
+
+```
+ 
+ 
+ Some interactive webapp with shiny. But first we have to clean some columns out of our data frame.
+ 
+```{r}
+weather <- weather %>%
+  select(-QN_3, -QN_4, -SDK, -SHK_TAG, -eor, -STATIONS_ID)
+```
+ 
+ 
+```{r}
+shinyApp(
+
+  ui = fluidPage(
+    titlePanel("Interactive visualization via shinyapp"),
+    sidebarLayout(
+          sidebarPanel(
+            conditionalPanel(
+              'input.dataset === "weather"',
+              selectInput("select1", "Choose x variable", names(weather)),
+              selectInput("select2", "Choose y variable", names(weather)),
+              selectInput("select3", "Choose size/colour Variable", names(weather)),
+              selectInput("group", "Choose a grouping option", choices = c("woche", "MESS_DATUM"))
+            ),
+            conditionalPanel(
+              'input.dataset === "df2"',
+              selectInput("select4", "Choose some variables", choices = names(df2), selected = "woche"),
+              selectInput("select5", "Choose y variable", names(df2)),
+              selectInput("select6", "Choose size Variable", names(df2)),
+              selectInput("group2", "Choose a grouping option", choices = c("woche", "Sorte"))
+            )
+    
+          ),
+          mainPanel(
+            tabsetPanel(
+              id = 'dataset',
+              tabPanel("weather",
+                       dataTableOutput("table1"),
+                       plotlyOutput("weather_plot")
+                       ),
+              tabPanel("df2",
+                       dataTableOutput("table2"),
+                       plotlyOutput("df2_plot")
+                       )
+            )
+          )
+    )
+  ),
+
+  server = function(input, output) {
+    
+    grouped_weather <- reactive({
+      switch (input$group,
+        "woche" = weather %>% group_by(woche),
+        "MESS_DATUM" = weather %>% group_by(MESS_DATUM)
+      )
+    })
+    grouped_df2 <- reactive({
+      switch (input$group2,
+        "woche" = df2 %>% group_by(woche) %>% summarise(variable4 = mean(get(input$select4)), variable5 = mean(get(input$select5)), variable6 = mean(get(input$select6))) %>%
+        plot_ly(x = ~variable4, y=~variable5, size = ~variable6, type=switch_type()),
+        "Sorte" = df2 %>% group_by(Sorte) %>% summarise(variable5 = mean(get(input$select5)), variable6 = mean(get(input$select6))) %>%
+        plot_ly(x = ~Sorte, y=~variable5, fill = ~variable6, type=switch_type())
+      )
+    })
+    switch_type <- reactive({
+      switch (input$group2,
+        "woche" = "scatter",
+        "Sorte" = "bar"
+      )
+    })
+    
+    
+    output$table1 <- renderDataTable({
+      datatable(weather)
+    })
+    output$table2 <- renderDataTable({
+      datatable(df2)
+    })
+    output$weather_plot <- renderPlotly({
+      
+      grouped_weather() %>%
+        summarise(variable1 = mean(get(input$select1)), variable2 = mean(get(input$select2)), variable3 = mean(get(input$select3))) %>%
+        plot_ly(x = ~variable1, y=~variable2, size = ~variable3, type="scatter", mode="lines+markers") 
+    })
+    output$df2_plot <- renderPlotly({
+      grouped_df2()
+    })
+    
+  },
+
+  options = list(height = 500)
+)
+
+```
+ 
+ 
+```{r}
+df2 %>%
+  group_by(Sorte) %>%
+  summarise(avg_per_tray = mean(`Gramm pro Tray`), avg_profit = mean(`Gewinn pro Tray bei Marktschwärmer`)) %>%
+  plot_ly(x = ~Sorte, y = ~avg_per_tray, fill = ~avg_profit, type = "box")
+
+class(df)
+class(weather)
 ```
  
  
