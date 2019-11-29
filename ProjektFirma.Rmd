@@ -89,7 +89,7 @@ If you want to save all your datawrangling than use the save function.
 Here we get the average amount of harvest per variety. I filtert out the varieties where we only got a few crops. So we concentrate on the varieties which are common. There "Radieschen rot", "Daikon Rettich", "Brokkoli", "Senf", "Sonnenblumen" und "Erbsen". 
 
 ```{r}
-df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
+vis1 <- df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
   group_by(Sorte) %>%
   summarise(Durchschnittserntemenge = mean(`Geerntet in gramm`/`Anzahl Trays`), avg_profit_per_tray = mean(`Gewinn pro Tray bei Marktschwärmer`)) %>%
   ggplot(aes(x = reorder(Sorte,Durchschnittserntemenge), y = Durchschnittserntemenge, fill = avg_profit_per_tray)) +
@@ -98,7 +98,8 @@ df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete",
   xlab("Variety") +
   ylab("Average amount of harvest in g")
   
-
+  
+ggplotly(vis1)
 
 ```
 
@@ -106,24 +107,36 @@ df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete",
 # Average time of grown
 
 ```{r}
-df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
+vis2 <- df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
   group_by(Sorte) %>%
-  summarise(avg_time = mean(Anbauzeit)) %>%
-  ggplot(aes(x = reorder(Sorte, avg_time), y = avg_time)) +
+  summarise(avg_time = mean(Anbauzeit), avg_amout_per_tray = mean(`Gramm pro Tray`)) %>%
+  ggplot(aes(x = reorder(Sorte, avg_time), y = avg_time, fill = avg_amout_per_tray)) +
   geom_col() +
   coord_flip() +
   ylab("Average time of growth in d")
+
+ggplotly(vis2)
 ```
 
 
 # Time of growth over time
 
 ```{r}
-df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
+vis3 <- df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
   group_by(Sorte) %>%
   ggplot(aes(x = Erntedatum, y = Anbauzeit, colour = Sorte)) +
   geom_line() + 
   geom_point() 
+
+vis4 <- df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
+  group_by(woche) %>%
+  summarise(avg_growth = mean(Anbauzeit)) %>%
+  ggplot(aes(x = woche, y = avg_growth)) +
+  geom_line() + 
+  geom_point()
+
+ggplotly(vis3)
+ggplotly(vis4)
 
 ```
 
@@ -326,6 +339,68 @@ weather <- weather %>%
   select(-QN_3, -QN_4, -SDK, -SHK_TAG, -eor, -STATIONS_ID)
 ```
  
+ Then we should build an app to show different plots. So we can analyse different harvest data with an app.
+ 
+```{r}
+shinyApp(
+  ui = fluidPage(
+    titlePanel("Different Plots to choose"),
+    sidebarLayout(
+      sidebarPanel(
+        conditionalPanel(
+          'input.dataset === "df2"',
+          radioButtons("select1", "Choose a plot", choices = list("Average amount and profit of harvest via variety" = "case1",
+                                                                  "Average days of growth and amount of harvest via variety" = "case2",
+                                                                  "Average days of growth via time" = "case3",
+                                                                  "Average days of growth via time and variety" = "case4"
+                                                                  )
+          )
+        ),
+        conditionalPanel(
+          'input.dataset === "weather"'
+        )
+      
+      ),
+      mainPanel(
+        tabsetPanel(
+          id = 'dataset',
+          tabPanel(
+            "df2",
+            plotlyOutput("plot_df")
+          ),
+          tabPanel(
+            "weather",
+            plotlyOutput("plot_weather")
+          )
+        )
+      )
+    
+    )
+  ),
+  server = function(input, output){
+    switch_df_plot <- reactive({
+      switch (input$select1,
+        "case1" = ggplotly(vis1),
+        "case2" = ggplotly(vis2),
+        "case3" = ggplotly(vis3),
+        "case4" = ggplotly(vis4)
+      )
+    })
+    
+    
+    output$plot_df <- renderPlotly({
+      switch_df_plot()
+    })
+    output$plot_weather <- renderPlotly({
+      switch_weather_plot()
+    })
+    
+  },
+  options = list(heigh = 500)
+)
+```
+
+Or We build an interactive app where you can choose varaiables, filter and group settings.
  
 ```{r}
 shinyApp(
