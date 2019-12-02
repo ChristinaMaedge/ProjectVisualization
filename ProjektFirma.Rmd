@@ -63,7 +63,7 @@ df <- df %>% select(-`Packungen Verkauft Marktschwärmer`) %>%
 
 ```
 
-Manipulate the Date and add an interval, week and some other columns.
+Manipulate the Date and add an interval and a week column.
 
 ```{r}
 df$Erntedatum <- ymd(df$Erntedatum)
@@ -77,7 +77,7 @@ df <- df %>%
 
 ```
 
-If you want to save all your datawrangling than use the save function.
+If you want to save all your data wrangling than you have to use the save function.
 
 ```{r}
 #saveRDS(df,"Erntetabelle.rds)
@@ -103,8 +103,11 @@ ggplotly(vis1)
 
 ```
 
+There are 3 good crops and three bad crops. Daikon Rettich, Radieschen rot and Sonnenblumen are the good ones. They have a good average amount of harvest and average profit per tray. The others aren't that good as the three before. Their average amount of harvest is half of the good ones. 
 
 # Average time of grown
+
+Let's have a look on the average time of growth. Maybe the bad crops are really fast or something like that.
 
 ```{r}
 vis2 <- df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
@@ -113,52 +116,70 @@ vis2 <- df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rot
   ggplot(aes(x = reorder(Sorte, avg_time), y = avg_time, fill = avg_amout_per_tray)) +
   geom_col() +
   coord_flip() +
-  ylab("Average time of growth in d")
+  ylab("Average time of growth in d") +
+  xlab("Varieties")
 
 ggplotly(vis2)
 ```
 
+We see that the time of growth are almost the same on every crop expect the peas and sunflowers. The peas need more than every other crop and the sunflowers need a little bit more than the rest.
 
 # Time of growth over time
+
+I want to show you how the time of growth changed over time. In the beginning you can see that i tested a lot to minimize the growth time. In the end of the year the temperatures outside drops and so the time of growth extend.
 
 ```{r}
 vis3 <- df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
   group_by(Sorte) %>%
   ggplot(aes(x = Erntedatum, y = Anbauzeit, colour = Sorte)) +
   geom_line() + 
-  geom_point() 
+  geom_point() +
+  xlab("Date of harvest") +
+  ylab("Time of growth")
+  
 
 vis4 <- df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
   group_by(woche) %>%
   summarise(avg_growth = mean(Anbauzeit)) %>%
   ggplot(aes(x = woche, y = avg_growth)) +
   geom_line() + 
-  geom_point()
+  geom_point() +
+  xlab("week") +
+  ylab("Average time of grwoth")
 
 ggplotly(vis3)
 ggplotly(vis4)
 
 ```
 
+You can see here the average time of growth for each crop or for all crops in average. You can see that in the end of the year it takes longer.
 
 # Lets look some variables over time
+
+Let's look if the average amount of harvest drops too. Or is it independent? Or can you say that the extend time of growth let the amount of harvest stay on the same level?
+
 
 ```{r}
 df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
   ggplot(aes(x = Erntedatum, y = `Gramm pro Tray`, colour = Sorte)) +
   geom_line() + 
-  geom_point() 
+  geom_point() +
+  xlab("Date of harvest") +
+  ylab("Average gramm of harvest by variety")
 
 df %>%
   filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander") %>%
   group_by(wochen = week(Erntedatum)) %>%
   summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
   ggplot(aes(x = wochen, y = avg_harvest)) +
-  geom_line()
+  geom_line() +
+  xlab("week") +
+  ylab("Average harvest in g")
   
 
 ```
 
+We can see that the amount of harvest is not dependent to the time of the year. Because the time of growth were longer the amount of harvest were the same. We can see that my farm becomes more consistent. The average amount of harvest is getting more over time. We have some bad harvests in our timeline. Maybe we can manage to get the reason for the bad harvests.
 
 Lets add the filter function to our data.frame.
 
@@ -166,17 +187,23 @@ Lets add the filter function to our data.frame.
 df1 <-df %>% filter(Sorte != "Bockshornklee", Sorte != "Mizuna", Sorte != "Rote Bete", Sorte != "Kohlrabi rot", Sorte != "Koriander")
 ```
 
-# Amount of Trays
+# Amount of Trays and possible profit
+
+Here a single calculation to see how much trays my farm produced and the possible profit for all the trays if i could have sold all.
 
 ```{r}
-df %>% summarise(AmountTrays = sum(`Anzahl Trays`, na.rm = TRUE))
+set1 <- df %>% summarise(AmountTrays = sum(`Anzahl Trays`, na.rm = TRUE), PossibleProfit = sum(`Anzahl Trays`, na.rm = TRUE)*450/1000*30) %>%
+  ggplot(aes(AmountTrays, PossibleProfit)) +
+  geom_col()
 
-df %>% summarise(PossibleProfit = sum(`Anzahl Trays`, na.rm = TRUE)*450/1000*30)
+ggplotly(set1)
 ```
 
 
 
 # Lets check the weather
+
+To check the reason of the bad harvest i add the weather data to my database. So we can see the min, max and average temperaturs next to the amount of harvest.
 
 First of all we have to load some data.
 
@@ -186,7 +213,7 @@ produkt_klima_tag_20180517_20191117_02564 <- read_delim("dataaktl/produkt_klima_
 ```
 
 
-Lets put the original data to a other data.frame and change the date column.
+Lets put the original data to a other data.frame and change the date column with lubridate.
 
 ```{r}
 weather <- produkt_klima_tag_20180517_20191117_02564
@@ -195,20 +222,22 @@ weather$MESS_DATUM <- ymd(weather$MESS_DATUM)
  
  Lets have a look on the weather data with a little plot but beforehand we shut just choose the date where the farm was producing. Here we see the column names and their meaning.
  
- FM : Daily mean of the wind speed in m/s
- FX : Maxima of the wind peak m/sec
- NM : Tagesmittel des Bedeckungsgrades in Achteln
- PM : Tagesmittel des Luftdrucks in hpa
- RSK : tgl. Niederschlagshöhe in mm
- RSKF : tgl. Niederschlagsform im numerischen Code
- SDK : Sonnenscheindauer in h
- SHK_TAG : Schneehoeher Tageswert in cm
- TGK : Minimum der Lufttemperatur am ERdboden in 5 cm Hoehe in °C
- TMK : Tagesmittel der Temperatur in °C
- TNK : Tagesminimum der Lufttemperatur in 2 m Hoehe in °C
- TXK : Tagesmaximum der Lufttemperatur in 2 m Hoehe in °C
- UPM : Tagesmittel der Relativen Feuchte in %
- VPM : Tagesmittel des DAmpfdruckes in hpa
+ FM : Daily mean of the wind speed in m/s  
+ FX : Maxima of the wind peak m/sec  
+ NM : Tagesmittel des Bedeckungsgrades in Achteln  
+ PM : Tagesmittel des Luftdrucks in hpa  
+ RSK : tgl. Niederschlagshöhe in mm  
+ RSKF : tgl. Niederschlagsform im numerischen Code  
+ SDK : Sonnenscheindauer in h  
+ SHK_TAG : Schneehoeher Tageswert in cm  
+ TGK : Minimum der Lufttemperatur am ERdboden in 5 cm Hoehe in °C  
+ TMK : Tagesmittel der Temperatur in °C  
+ TNK : Tagesminimum der Lufttemperatur in 2 m Hoehe in °C  
+ TXK : Tagesmaximum der Lufttemperatur in 2 m Hoehe in °C  
+ UPM : Tagesmittel der Relativen Feuchte in %  
+ VPM : Tagesmittel des DAmpfdruckes in hpa  
+ 
+ Let's filter the weather data for time i was producing on my farm.
  
 ```{r}
 weather <- weather %>% filter(year(weather$MESS_DATUM) == 2019, yday(weather$MESS_DATUM) >= 182, yday(weather$MESS_DATUM) <= 295) 
@@ -229,19 +258,30 @@ weather %>%
  
 ```
  
- Try to get information for the plots from two different datasets.
+ We can see the average temperature for the time of year were my farm produced in a glasshouse.
+ 
+# Try to get the dependencies
+
+ Try to get information for the plots from two different datasets. And maybe we can see that the time of growth extend if the temperature went down.
  
 ```{r}
 
 b1 <- ggplot() +
   geom_point(data = weather, aes(x = MESS_DATUM, y = TNK)) +
-  geom_smooth(data = weather, aes(x = MESS_DATUM, y = TNK)) 
+  geom_smooth(data = weather, aes(x = MESS_DATUM, y = TNK)) +
+  xlab("Date of messurement") +
+  ylab("The minimum temperature of this day in 2m hight")
 b2 <- ggplot() +
-  geom_smooth(data = df1, aes(x = Erntedatum, y = Anbauzeit), show.legend = FALSE)
+  geom_smooth(data = df1, aes(x = Erntedatum, y = Anbauzeit), show.legend = FALSE) +
+  xlab("Date of harvest") +
+  ylab("Time of growth")
 
 grid.arrange(b1,b2)
 
 ```
+ 
+ We can see that the temperture drops and the average time of growth extend.
+ 
  
  Some data wrangling to do better visualizations. I added some average temperatures to the havest data.frame.
  
@@ -265,15 +305,19 @@ p1 <- p1 %>%
   summarise(avg_harvest = mean(`Gramm pro Tray`), avg_tnk_week = mean(avg_tnk_week), avg_txk_week = mean(avg_txk_week)) %>%
   ggplot(aes(x = woche, y = avg_harvest))  +
   geom_line() +
-  geom_smooth()
+  geom_smooth() +
+  xlab("week")
 
-p1
+p1 
 
 p1 +
-  geom_point(aes(size = avg_tnk_week, colour = avg_txk_week))
+  geom_point(aes(size = avg_tnk_week, colour = avg_txk_week)) +
+  xlab("week")
 
 
 ```
+ 
+ In the first plot we can't see a lot but in the second we can imagine that the temperature are realy high or low before a bad harvest. Let's try a different visualization to see that better.
  
  Create a line for every variety.
  
@@ -284,23 +328,26 @@ p2 <- df2 %>%
 p2 %>%
   summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
   ggplot(aes(x = woche, y = avg_harvest, colour = Sorte)) +
-  geom_line()
+  geom_line() +
+  xlab("week")
  
 ```
  
- Add some more layers and tidy up the varieties.
+ Now we can see the harvest for every crop. Let's add some more layers and tidy up the varieties.
  
 ```{r}
-p2 %>%
+p2 <- p2 %>%
   summarise(avg_harvest = mean(`Gramm pro Tray`)) %>%
   ggplot(aes(x = woche, y = avg_harvest)) +
   geom_line() +
-  facet_wrap(~ Sorte)
+  facet_wrap(~ Sorte) +
+  xlab("week")
 
+p2
   
 ```
  
- 
+ Now we can see how the different crops do in harvest. And which variety has bad harvest and which not. But we can't see the temperature so let's do a grid arrange.
  To put the two datasets into one plot we have to normalize the numeric numbers or we use a grid.Extra package to show the different plots above each other.
  
 ```{r}
@@ -308,14 +355,18 @@ p2 %>%
 p3 <- weather %>%
   ggplot(aes(x = woche, y = TNK)) +
   geom_point(colour = "blue") +
-  geom_point(aes(x = woche, y = TXK), colour = "red")
+  geom_point(aes(x = woche, y = TXK), colour = "red") +
+  xlab("week")
 
 grid.arrange(p1,p3)
 
 
 ```
  
+ Now we can see that in the weeks before the bad harvest we have very high temperatures or very low temperatures.
  
+# Amount of trays per week
+
  Lets have a look on the amount of trays per week.
  
 ```{r}
@@ -324,13 +375,17 @@ p4 <- df2 %>%
   summarise(amountTrays = sum(`Anzahl Trays`), amountGramm = sum(`Geerntet in gramm`), avg_tnk_week = mean(avg_tnk_week)) %>%
   ggplot(aes(x = woche, y = amountTrays, size = amountGramm, colour = avg_tnk_week)) +
   geom_point() +
-  geom_smooth() 
+  geom_smooth() +
+  xlab("week")
 
 ggplotly(p4, tooltip = c("colour", "size"))
   
 
 ```
  
+ We can see that their is space for improvements. Sometimes lower amount of trays have the same amount of harvest in gramm or better. 
+ 
+# Interactive Shiny Web App
  
  Some interactive webapp with shiny. But first we have to clean some columns out of our data frame.
  
@@ -339,7 +394,7 @@ weather <- weather %>%
   select(-QN_3, -QN_4, -SDK, -SHK_TAG, -eor, -STATIONS_ID)
 ```
  
- Then we should build an app to show different plots. So we can analyse different harvest data with an app.
+ Then we should build an app to show different plots. So we can analyse different harvest data with an app. I put the plots i build before into the app.
  
 ```{r}
 shinyApp(
@@ -351,8 +406,10 @@ shinyApp(
           'input.dataset === "df2"',
           radioButtons("select1", "Choose a plot", choices = list("Average amount and profit of harvest via variety" = "case1",
                                                                   "Average days of growth and amount of harvest via variety" = "case2",
-                                                                  "Average days of growth via time" = "case3",
-                                                                  "Average days of growth via time and variety" = "case4"
+                                                                  "Average days of growth by time" = "case3",
+                                                                  "Average days of growth by time and variety" = "case4",
+                                                                  "Average amount of harvest by time" = "case5",
+                                                                  "Amount of trays and average min temp by week/time" = "case6"
                                                                   )
           )
         ),
@@ -383,7 +440,9 @@ shinyApp(
         "case1" = ggplotly(vis1),
         "case2" = ggplotly(vis2),
         "case3" = ggplotly(vis3),
-        "case4" = ggplotly(vis4)
+        "case4" = ggplotly(vis4),
+        "case5" = ggplotly(p2),
+        "case6" = ggplotly(p4, tooltip = c("colour", "size"))
       )
     })
     
@@ -396,11 +455,12 @@ shinyApp(
     })
     
   },
-  options = list(heigh = 1000)
+  options = list(height = 800)
 )
+
 ```
 
-Or We build an interactive app where you can choose varaiables, filter and group settings.
+Or we build an interactive app where you can choose varaiables, filter and group settings. So we can do our visualization in an application. So people with no knowledge of R can do some viasualization as well. We add some possible filters and group statements. So we try to filter out possible failures. So the user experience of the app is as good as possible.
  
 ```{r}
 shinyApp(
@@ -418,10 +478,9 @@ shinyApp(
             ),
             conditionalPanel(
               'input.dataset === "df2"',
-              selectInput("select4", "Choose some variables", choices = names(df2), selected = "woche"),
+              radioButtons("select4", "Choose x variable", choices = c("woche", "Sorte"), selected = "woche"),
               selectInput("select5", "Choose y variable", names(df2)),
-              selectInput("select6", "Choose size Variable", names(df2)),
-              selectInput("group2", "Choose a grouping option", choices = c("woche", "Sorte"))
+              selectInput("select6", "Choose size Variable", names(df2))
             )
     
           ),
@@ -450,15 +509,15 @@ shinyApp(
       )
     })
     grouped_df2 <- reactive({
-      switch (input$group2,
+      switch (input$select4,
         "woche" = df2 %>% group_by(woche) %>% summarise(variable4 = mean(get(input$select4)), variable5 = mean(get(input$select5)), variable6 = mean(get(input$select6))) %>%
         plot_ly(x = ~variable4, y=~variable5, size = ~variable6, type=switch_type()),
         "Sorte" = df2 %>% group_by(Sorte) %>% summarise(variable5 = mean(get(input$select5)), variable6 = mean(get(input$select6))) %>%
-        plot_ly(x = ~Sorte, y=~variable5, fill = ~variable6, type=switch_type())
+        plot_ly(x = ~Sorte, y=~variable5, color = ~variable6, type=switch_type())
       )
     })
     switch_type <- reactive({
-      switch (input$group2,
+      switch (input$select4,
         "woche" = "scatter",
         "Sorte" = "bar"
       )
@@ -483,17 +542,18 @@ shinyApp(
     
   },
 
-  options = list(height = 1000)
+  options = list(height = 1500)
 )
 
 ```
  
+# Some testet Plots
  
 ```{r}
 df2 %>%
   group_by(Sorte) %>%
   summarise(avg_per_tray = mean(`Gramm pro Tray`), avg_profit = mean(`Gewinn pro Tray bei Marktschwärmer`)) %>%
-  plot_ly(x = ~Sorte, y = ~avg_per_tray, fill = ~avg_profit, type = "box")
+  plot_ly(x = ~Sorte, y = ~avg_per_tray, colour = ~avg_profit, type = "bar")
 
 class(df)
 class(weather)
