@@ -1,5 +1,6 @@
 ---
-title: ""
+title: "Verture Farm"
+author: "Felix Doobe"
 date: "`r Sys.Date()`"
 output:
   rmdformats::readthedown:
@@ -245,9 +246,11 @@ weather <- weather %>% filter(year(weather$MESS_DATUM) == 2019, yday(weather$MES
 weather <- weather %>% 
   mutate(woche = week(weather$MESS_DATUM))
 
-weather %>%
+w1 <- weather %>%
   ggplot(aes(x= MESS_DATUM, y = TMK)) +
   geom_point()
+
+w1
   
 #  year(weather$MESS_DATUM)  # Gibt das Jahr aus für alle Daten im df
 #  date(weather$MESS_DATUM)  # Gibt das Datum aus für alle Daten im df
@@ -414,7 +417,12 @@ shinyApp(
           )
         ),
         conditionalPanel(
-          'input.dataset === "weather"'
+          'input.dataset === "weather"',
+          radioButtons("select2", "Choose a plot", choices = list("Average temp by time" = "case7",
+                                                                  "Temperature by week" = "case8",
+                                                                  "Min and max temp by week" = "case9"
+                                                                  )
+                       )
         )
       
       ),
@@ -443,6 +451,13 @@ shinyApp(
         "case4" = ggplotly(vis4),
         "case5" = ggplotly(p2),
         "case6" = ggplotly(p4, tooltip = c("colour", "size"))
+      )
+    })
+    switch_weather_plot <- reactive({
+      switch (input$select2,
+        "case7" = ggplotly(w1),
+        "case8" = ggplotly(b1),
+        "case9" = ggplotly(p3)
       )
     })
     
